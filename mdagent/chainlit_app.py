@@ -1,6 +1,6 @@
-"""md-agent 的 Chainlit 前端：复用 md_agent 里的 LangGraph 图与工具，只换界面。
+"""md-agent 的 Chainlit 前端：复用 agent 里的 LangGraph 图与工具，只换界面。
 
-启动：chainlit run md_chainlit.py -h 0.0.0.0 -p 7779
+启动：chainlit run mdagent/chainlit_app.py -h 0.0.0.0 -p 7779
 设置面板填路径，聊天框写要做什么（等价于原来的"附加指令"）。
 """
 import datetime
@@ -10,7 +10,7 @@ import chainlit as cl
 from chainlit.input_widget import Select, Switch, TextInput
 from langchain_core.messages import HumanMessage, SystemMessage
 
-import md_agent as A
+import agent as A
 
 WELCOME = (
     "### MD Agent 控制台\n\n"
@@ -54,8 +54,8 @@ NODE_LABELS = {
 
 
 def _prep_settings():
-    # 选项直接从 md_prep_defs 取，避免两处维护力场/水模型列表。
-    import md_prep_defs as _P
+    # 选项直接从 prep_defs 取，避免两处维护力场/水模型列表。
+    import prep_defs as _P
     out = [
         TextInput(id='protein_pdb', label='准备体系-蛋白pdb', initial=''),
         TextInput(id='ligand_file', label='准备体系-配体文件', initial=''),

@@ -22,14 +22,14 @@
 
 ### 两个必须能画出来的图
 
-**主图**（`md_agent.py:1167`）：
+**主图**（`agent.py:1167`）：
 
 ```
 START → router ─┬─(pipeline)→ pipeline(子图) → parse_results → gpcr_report → summarize → END
                 └─(query/chat)→ reply → reply_tools ↩
 ```
 
-**子图**（`build_pipeline_subgraph`，`md_agent.py:366`）：
+**子图**（`build_pipeline_subgraph`，`agent.py:366`）：
 
 ```
 START ─┬─(mode=gpcr)──→ gpcr_setup ──→ gpcr_l2 → gpcr_l3 → gpcr_l4 → gpcr_l5 → gpcr_plot → gpcr_compare → END
@@ -45,14 +45,14 @@ START ─┬─(mode=gpcr)──→ gpcr_setup ──→ gpcr_l2 → gpcr_l3 →
 
 | 项 | 值 | 位置 |
 |---|---|---|
-| 工具总数 | 30 个（`md_tools.py` 里 `@tool`） | `md_agent.py:36-62` 的 import 清单 |
-| 工具结果截断阈值 | 16000 字符 | `md_agent.py:105` `MAX_TOOL_RESULT_CHARS` |
-| 进度轮询 | 每 30 秒，最多 120 次（即 60 分钟） | `md_agent.py:268-269` |
-| 单步重试上限 | 2 次 | `md_agent.py:100` `MAX_RETRIES` |
-| 图节点数（子图） | 21 个 | `md_agent.py:366-556` |
+| 工具总数 | 30 个（`tools.py` 里 `@tool`） | `agent.py:36-62` 的 import 清单 |
+| 工具结果截断阈值 | 16000 字符 | `agent.py:105` `MAX_TOOL_RESULT_CHARS` |
+| 进度轮询 | 每 30 秒，最多 120 次（即 60 分钟） | `agent.py:268-269` |
+| 单步重试上限 | 2 次 | `agent.py:100` `MAX_RETRIES` |
+| 图节点数（子图） | 21 个 | `agent.py:366-556` |
 | GPCR 分析层 | 5 层（编号 / 激活坐标 / 景观 / 耦合 / 元动力学）+ 出图 + 对比 | `GPCR_SETUP_TOOLS`…`GPCR_PLOT_TOOLS` |
-| 出图组数 | 12 组 | `md_gpcr_plots.py` |
-| 入口数 | 4（CLI / Gradio / Chainlit / MCP） | `md_agent.py`、`md_ui.py`、`md_chainlit.py`、`md_mcp_server.py` |
+| 出图组数 | 12 组 | `gpcr_plots.py` |
+| 入口数 | 4（CLI / Gradio / Chainlit / MCP） | `agent.py`、`ui.py`、`chainlit_app.py`、`mcp_server.py` |
 | 走 LLM 的节点 | 5 个（router 兜底、step1-4_llm、repair、reply、summarize） | 见 §2 |
 
 ### 如果只让你讲两件事
@@ -74,7 +74,7 @@ START ─┬─(mode=gpcr)──→ gpcr_setup ──→ gpcr_l2 → gpcr_l3 →
 
 查执行日志，发现模型在第 4 步返回了 **空的 `tool_calls`**。
 
-关键在于出口条件边 `_llm_has_tool_call`（`md_agent.py:183`）：
+关键在于出口条件边 `_llm_has_tool_call`（`agent.py:183`）：
 
 ```python
 def _llm_has_tool_call(state):
@@ -84,7 +84,7 @@ def _llm_has_tool_call(state):
     return "__next__"
 ```
 
-而 `__next__` 在 `add_conditional_edges` 里映射到了 `__end__`（`md_agent.py:469`）。
+而 `__next__` 在 `add_conditional_edges` 里映射到了 `__end__`（`agent.py:469`）。
 
 于是逻辑链变成：**模型「这一轮没决定调工具」→ 被当成「任务做完了」→ 整条链终结**。这不是模型犯错，是我的出口条件把「沉默」解释成了「完成」。
 
@@ -101,7 +101,7 @@ def _llm_has_tool_call(state):
 
 ### 怎么做
 
-新建节点工厂 `_make_det_node`（`md_agent.py:226`），直接按顺序 `tool.invoke({})`，完全不进模型：
+新建节点工厂 `_make_det_node`（`agent.py:226`），直接按顺序 `tool.invoke({})`，完全不进模型：
 
 ```python
 def _make_det_node(name, tools, headline):
@@ -121,7 +121,7 @@ def _make_det_node(name, tools, headline):
     return _node
 ```
 
-然后把这一串接成普通边（`md_agent.py:527-529`）：
+然后把这一串接成普通边（`agent.py:527-529`）：
 
 ```python
 _chain = ["gpcr_setup", "gpcr_l2", "gpcr_l3", "gpcr_l4", "gpcr_l5",
@@ -171,7 +171,7 @@ A：会同样静默结束。这个风险我承认还在——step1–4 的参数
 
 ### 怎么做
 
-每个 LLM 节点在工厂里就绑定了自己那一步的工具集（`md_agent.py:83-97` 定义分组，`:186` 使用）：
+每个 LLM 节点在工厂里就绑定了自己那一步的工具集（`agent.py:83-97` 定义分组，`:186` 使用）：
 
 ```python
 STEP1_TOOLS = [run_gromacs_md]                                    # 只看得见这一个
@@ -191,7 +191,7 @@ def _make_step_llm_node(step_num, system_prompt, bound_tools):
     return _node
 ```
 
-最狠的是收尾节点（`md_agent.py:678`）：
+最狠的是收尾节点（`agent.py:678`）：
 
 ```python
 def summarize_node(state):
@@ -232,7 +232,7 @@ agent 跑起来会疯狂吃上下文。这个项目最脏的三个地方：
 
 ### 怎么做（三层，一层比一层彻底）
 
-**第一层：根本不进模型。** 进度轮询是纯确定性节点（`progress_poll_node`，`md_agent.py:279`），直接 `glob` 工作区数 `.gro`，一个 token 都不花：
+**第一层：根本不进模型。** 进度轮询是纯确定性节点（`progress_poll_node`，`agent.py:279`），直接 `glob` 工作区数 `.gro`，一个 token 都不花：
 
 ```python
 def progress_poll_node(state, config=None, **kwargs):
@@ -247,7 +247,7 @@ def progress_poll_node(state, config=None, **kwargs):
 
 **那个固定 `id` 是个关键细节**：`add_messages` reducer 的规则是「同 id 覆盖」。如果不给 id，120 次轮询会往状态里堆 120 条「还在跑」——既爆上下文又刷屏。给了固定 id，状态里永远只有一条最新进度。
 
-**第二层：落盘 + 回灌摘要。** 大的分析结果不直接进模型。`_py_tool`（`md_tools.py:750`）跑完 worker 后，把完整 JSON 写成 `analysis_<task>.json`，只把渲染好的几行小结返回：
+**第二层：落盘 + 回灌摘要。** 大的分析结果不直接进模型。`_py_tool`（`tools.py:750`）跑完 worker 后，把完整 JSON 写成 `analysis_<task>.json`，只把渲染好的几行小结返回：
 
 ```python
 def _py_tool(task, summary_fn, timeout=3600, **payload):
@@ -262,7 +262,7 @@ def _py_tool(task, summary_fn, timeout=3600, **payload):
 
 模型想知道细节，自己 `read_file`。**这比一次性全给更省**，因为大多数时候它只需要知道「成了、关键数字是多少」。
 
-**第三层：截断。** 一定会有工具返回超长文本（比如 `read_file` 读了个大文件）。`TaskAwareToolNode` 继承 `ToolNode` 覆写 `invoke`/`ainvoke`（`md_agent.py:116`），对所有工具结果统一截断：
+**第三层：截断。** 一定会有工具返回超长文本（比如 `read_file` 读了个大文件）。`TaskAwareToolNode` 继承 `ToolNode` 覆写 `invoke`/`ainvoke`（`agent.py:116`），对所有工具结果统一截断：
 
 ```python
 MAX_TOOL_RESULT_CHARS = 16000
@@ -298,7 +298,7 @@ A：会，而且没有兜底。这是**已知未修**（见 §13）。真要稳�
 
 ### 优化点
 
-用 `contextvars.ContextVar`（`md_tools.py:31`）：
+用 `contextvars.ContextVar`（`tools.py:31`）：
 
 ```python
 current_workspace = contextvars.ContextVar('current_workspace', default='.')
@@ -320,9 +320,9 @@ def get_workspace_path(sub_dir=""):
 
 **三个入口各自负责设置它**：
 
-- LangGraph 侧：`TaskAwareToolNode.invoke` 从 `config["configurable"]["thread_id"]` 读 task_id 然后 `current_workspace.set(...)`（`md_agent.py:123`）。所以 **thread_id 同时是工作目录名**。
-- 确定性节点：`_make_det_node` 里同样从 config 读（`md_agent.py:230`）。这里必须单独写一遍，因为确定性节点不经过 `TaskAwareToolNode`。**这是踩过的坑**——第一版忘了加，导致分析结果写到了错误目录。
-- MCP 侧：`_apply_workspace()` 从模块级的 `_ACTIVE_TASK` 读（`md_mcp_server.py:88`）。
+- LangGraph 侧：`TaskAwareToolNode.invoke` 从 `config["configurable"]["thread_id"]` 读 task_id 然后 `current_workspace.set(...)`（`agent.py:123`）。所以 **thread_id 同时是工作目录名**。
+- 确定性节点：`_make_det_node` 里同样从 config 读（`agent.py:230`）。这里必须单独写一遍，因为确定性节点不经过 `TaskAwareToolNode`。**这是踩过的坑**——第一版忘了加，导致分析结果写到了错误目录。
+- MCP 侧：`_apply_workspace()` 从模块级的 `_ACTIVE_TASK` 读（`mcp_server.py:88`）。
 
 ### 代价（要主动讲）
 
@@ -353,7 +353,7 @@ A：格式是 `task_{YYYYMMDD_HHMM}_{run_name}`，精确到分钟。同一分钟
 
 ### 怎么做
 
-**后台提交**（`md_tools.py:191`）：用 `subprocess.Popen` + `nohup` 把 `gmx mdrun` 挂到后台，把 PID 写文件，然后**立即返回**：
+**后台提交**（`tools.py:191`）：用 `subprocess.Popen` + `nohup` 把 `gmx mdrun` 挂到后台，把 PID 写文件，然后**立即返回**：
 
 ```python
 subprocess.Popen(f'cd {ws} && nohup {cmd} > {run_name}.out 2>&1 & echo $! > {pidf}', shell=True)
@@ -364,7 +364,7 @@ return f"【MD 已挂起】mdrun 后台运行中 (PID={pid}, {steps_txt})\n完�
 
 注意 `time.sleep(2)` 是必要的：`Popen` 是异步的，不等一下 PID 文件可能还没写出来。
 
-**轮询**（`md_agent.py:279`）：`progress_poll` 节点自循环，每 30 秒查一次 `.gro` 是否存在：
+**轮询**（`agent.py:279`）：`progress_poll` 节点自循环，每 30 秒查一次 `.gro` 是否存在：
 
 ```python
 def progress_poll_route(state):
@@ -377,7 +377,7 @@ def progress_poll_route(state):
 
 **为什么用「自循环」而不是一个 `while` 循环**：因为在图里，每一步都是一次状态更新，可以被打断、可以恢复。如果写成 `while` 循环，整个等待就变成了一个黑盒节点——前端看不到中间进度，checkpoint 也没法在中间保存。
 
-**断点续跑**：图编译时带了 `MemorySaver`（`md_agent.py:1196`）：
+**断点续跑**：图编译时带了 `MemorySaver`（`agent.py:1196`）：
 
 ```python
 agent_executor = workflow.compile(checkpointer=memory)
@@ -418,7 +418,7 @@ A：会，而且这是个真问题。如果同时有两个任务，一个的轮�
 
 ### 怎么做
 
-`build_gpcr_report()`（`md_agent.py:1120`）从各层的 `analysis_*.json` 里读数字，按五节拼成纯文本：
+`build_gpcr_report()`（`agent.py:1120`）从各层的 `analysis_*.json` 里读数字，按五节拼成纯文本：
 
 ```
 一、观察（测到了什么）      ← _sec_observe + _sec_observe2
@@ -428,7 +428,7 @@ A：会，而且这是个真问题。如果同时有两个任务，一个的轮�
 五、产出清单（磁盘实测）    ← _sec_artifacts
 ```
 
-**第五节是专门为「模型胡说」加的**（`md_agent.py:1103`）：
+**第五节是专门为「模型胡说」加的**（`agent.py:1103`）：
 
 ```python
 def _sec_artifacts(ws):
@@ -453,7 +453,7 @@ def _sec_artifacts(ws):
 
 根因是：`_sec_limits` 在「没有 compare」这一情况下什么都不输出，留了个空档，模型就自己补上了。
 
-修法是显式填死（`md_agent.py:1097`）：
+修法是显式填死（`agent.py:1097`）：
 
 ```python
 if not cp:
@@ -487,7 +487,7 @@ A：目前没有自动校验。骨架同时落盘成 `summary/gpcr_conclusion.md
 
 ### 怎么做（四个机制）
 
-**1. 每个均值必须带置信区间和有效样本量。** `analyze_uncertainty` 做分块 bootstrap + 自相关估计 ESS。`_sec_stats`（`md_agent.py:991`）在 ESS 过低时直接标注：
+**1. 每个均值必须带置信区间和有效样本量。** `analyze_uncertainty` 做分块 bootstrap + 自相关估计 ESS。`_sec_stats`（`agent.py:991`）在 ESS 过低时直接标注：
 
 ```python
 ess = _ess_of(v)
@@ -502,7 +502,7 @@ else:
     out.append("  未跑 analyze_uncertainty：本节所有均值都没有 CI/ESS 支撑。")
 ```
 
-**2. FES 先判收敛，再谈结论。** 元动力学的收敛检查是分块比较 `rms_centered`（`md_agent.py:1003`）：
+**2. FES 先判收敛，再谈结论。** 元动力学的收敛检查是分块比较 `rms_centered`（`agent.py:1003`）：
 
 ```python
 vals = [e.get("rms_centered") for e in (fm.get("convergence") or []) if e.get("rms_centered") is not None]
@@ -517,7 +517,7 @@ if vals:
 
 同一件事在 `_sec_limits` 里再说一遍，确保它出现在「边界」一节而不是被埋在「统计」里。
 
-**3. 测不到的位点进缺失列表，不猜。** `_sec_limits`（`md_agent.py:1065`）：
+**3. 测不到的位点进缺失列表，不猜。** `_sec_limits`（`agent.py:1065`）：
 
 ```python
 miss = (A.get("microswitches") or {}).get("missing_measurements") or []
@@ -553,18 +553,18 @@ out.append("（以上为按公认判据的机制解读，属于可检验的假�
 
 ### 优化点
 
-**工具层独立，界面层薄。** 30 个 `@tool` 在 `md_tools.py` 里写一次，四个入口全部从它 import。
+**工具层独立，界面层薄。** 30 个 `@tool` 在 `tools.py` 里写一次，四个入口全部从它 import。
 
 ### 四个入口
 
 | 入口 | 文件 | 怎么用同一套工具 |
 |---|---|---|
-| CLI | `md_agent.py:1309` `run_cli` | 直接调 `agent_executor.stream` |
-| Gradio | `md_agent.py:1252` `submit_task` + `md_ui.py` | 同上，UI 在 `md_ui.py` 里 |
-| Chainlit | `md_chainlit.py` | 同上，改用 `astream` 逐节点开 `cl.Step` |
-| MCP | `md_mcp_server.py` | 把 `@tool` 的 `.func` 重新包一层，暴露成 MCP 工具 |
+| CLI | `agent.py:1309` `run_cli` | 直接调 `agent_executor.stream` |
+| Gradio | `agent.py:1252` `submit_task` + `ui.py` | 同上，UI 在 `ui.py` 里 |
+| Chainlit | `chainlit_app.py` | 同上，改用 `astream` 逐节点开 `cl.Step` |
+| MCP | `mcp_server.py` | 把 `@tool` 的 `.func` 重新包一层，暴露成 MCP 工具 |
 
-MCP 那一层有个细节（`md_mcp_server.py:92`）：
+MCP 那一层有个细节（`mcp_server.py:92`）：
 
 ```python
 def _wrap_tool(lc_tool):
@@ -583,9 +583,9 @@ for _t in _ATOMIC_TOOLS:
 
 ### 界面与业务分离的实际收益
 
-这个项目一个月内换了两次前端（Gradio 深度定制 → Chainlit）。因为业务逻辑全在 `md_agent.py` 和 `md_tools.py`，换前端只动 `md_ui.py` / `md_chainlit.py`，图、工具、分析后端一行没改。
+这个项目一个月内换了两次前端（Gradio 深度定制 → Chainlit）。因为业务逻辑全在 `agent.py` 和 `tools.py`，换前端只动 `ui.py` / `chainlit_app.py`，图、工具、分析后端一行没改。
 
-`md_ui.py` 的接口就是两个回调（`md_agent.py:1363`）：
+`ui.py` 的接口就是两个回调（`agent.py:1363`）：
 
 ```python
 demo = build_ui(submit_task, package_results)
@@ -619,7 +619,7 @@ A：Chainlit（7779）。Gradio 那个（7778）已经停了。Chainlit 的优�
 
 ### 怎么做
 
-`_detect_mode`（`md_agent.py:574`）先扫关键词：
+`_detect_mode`（`agent.py:574`）先扫关键词：
 
 ```python
 MD_MARKERS = ["tpr", "step5_1", ".gro", "mdrun", "md 模拟", "分子动力学", "轨迹",
@@ -640,7 +640,7 @@ def _detect_mode(text) -> str:
     return "md" if md else ""
 ```
 
-命中就直接定意图和模式。`router_node`（`md_agent.py:603`）只在没命中时才调 LLM：
+命中就直接定意图和模式。`router_node`（`agent.py:603`）只在没命中时才调 LLM：
 
 ```python
 mode = _detect_mode(last_user)
@@ -663,8 +663,8 @@ if intent not in ("pipeline", "query", "chat"):
 **关键词表本身成了新的脆弱点。** 这就是 BUG-4 的成因：`MD_MARKERS` 里有 `"run_name"` 这个通用词，而 Chainlit 前端**无条件**把 `run_name: md` 拼进 prompt（因为 `run_name` 有 `or "md"` 默认值），于是「你好」也命中了关键词 → 判成 MD 任务 → 跑了整条流水线还打了个 zip。
 
 两处修：
-1. 前端只在**真填了任务参数**时才拼任务指令（`md_chainlit.py:72`）；
-2. 打包也绑到 `is_task` 上（`md_chainlit.py:112`）。
+1. 前端只在**真填了任务参数**时才拼任务指令（`chainlit_app.py:72`）；
+2. 打包也绑到 `is_task` 上（`chainlit_app.py:112`）。
 
 **结论**：用确定性匹配换确定性判定，匹配表就成了新的脆弱点。这是这个设计的固有风险，不是可以回避的。可迁移的做法是——第一层路由用规则，但**规则表的每一个词都要问「它会不会在无关的话里出现」**。
 
@@ -686,7 +686,7 @@ A：有。「模拟」「轨迹」这些词在闲聊里也可能出现（「我�
 
 ### 怎么做：两条不同的策略
 
-**MD 四步：失败就进 repair。** 因为步骤有强依赖——`compute_rmsd` 依赖 `analysis.ndx`，没 index 就没法算。所以出口条件边 `_post_tool_route`（`md_agent.py:253`）在检测到 `【执行报错】` 时转到 `repair`：
+**MD 四步：失败就进 repair。** 因为步骤有强依赖——`compute_rmsd` 依赖 `analysis.ndx`，没 index 就没法算。所以出口条件边 `_post_tool_route`（`agent.py:253`）在检测到 `【执行报错】` 时转到 `repair`：
 
 ```python
 def _post_tool_route(next_node):
@@ -699,7 +699,7 @@ def _post_tool_route(next_node):
 
 repair 回路：`repair`（LLM 决定调哪个诊断工具）→ `repair_tools` → 按 `failed_step` 回到对应步骤，`retry_count > MAX_RETRIES`（2）才真退出。
 
-`failed_step` 的写入在工厂里（`md_agent.py:209`）：
+`failed_step` 的写入在工厂里（`agent.py:209`）：
 
 ```python
 if last and _is_tool_error(last):
@@ -751,7 +751,7 @@ def repair_route(state):
 
 ### 11.1 每个节点变成一个可折叠的步骤
 
-Chainlit 版把图的每个节点名映射成中文，逐节点开 `cl.Step`（`md_chainlit.py:85`）：
+Chainlit 版把图的每个节点名映射成中文，逐节点开 `cl.Step`（`chainlit_app.py:85`）：
 
 ```python
 NODE_LABELS = {"router": "判定任务模式", "progress_poll": "等待模拟进度",
@@ -772,7 +772,7 @@ async for event in A.agent_executor.astream(init, config, stream_mode="updates")
 
 ### 11.2 只用 `is_task` 决定要不要走任务的整套动作
 
-这是 BUG-4 的修法，值得单列因为它是个通用模式（`md_chainlit.py:70-112`）：
+这是 BUG-4 的修法，值得单列因为它是个通用模式（`chainlit_app.py:70-112`）：
 
 ```python
 has_task = bool(tpr or nsteps or traj or ws or ws_b or analyze_only)

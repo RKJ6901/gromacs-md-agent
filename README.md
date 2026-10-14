@@ -60,17 +60,17 @@ router ─(pipeline)─> pipeline 子图 ─> parse_results ─> gpcr_report ─
 
 | 文件 | 作用 |
 |---|---|
-| `md_tools.py` | 工具层：GROMACS 命令封装 + 29 个 `@tool`（LangGraph 与 MCP 共用）+ 出图工具 |
-| `md_agent.py` | LangGraph 编排 + Gradio UI + CLI（三种模式） |
-| `md_mcp_server.py` | MCP Server（29 个原子工具 + create_task/list_tasks/set_workspace） |
-| `gpcr_defs.py` | GPCR 领域层：BW 通用编号、TM/ICL/ECL 段、微开关位点；**纯标准库**，两个 env 都能 import |
-| `md_analysis_worker.py` | 重分析后端（跑在分析 env）：编号识别、分段、微开关、TM6、配体保留、PLUMED 解析 |
-| `md_gpcr_tasks.py` | 第 3/4/5 层：景观、不确定度、DCCM/MI、PSN、lead-lag、水网络、FES、A/B 对比 |
-| `md_plot_style.py` | 共享出图排版原语（两套出图共用，风格强制一致） |
-| `md_gpcr_plots.py` | GPCR 12 组分层图 |
-| `md_ui.py` / `md_ui.css` | 控制台外观层：Gradio 6 主题、设计系统 CSS、布局；业务回调由 `md_agent.py` 传入 |
-| `md_chainlit.py` | Chainlit 前端（另一套界面）：复用同一张图，把每个节点渲染成可展开的步骤；设置面板在左下角 |
-| `md_manuals/md_docs/` | RAG 语料 |
+| `mdagent/tools.py` | 工具层：GROMACS 命令封装 + 29 个 `@tool`（LangGraph 与 MCP 共用）+ 出图工具 |
+| `mdagent/agent.py` | LangGraph 编排 + Gradio UI + CLI（三种模式） |
+| `mdagent/mcp_server.py` | MCP Server（29 个原子工具 + create_task/list_tasks/set_workspace） |
+| `mdagent/gpcr_defs.py` | GPCR 领域层：BW 通用编号、TM/ICL/ECL 段、微开关位点；**纯标准库**，两个 env 都能 import |
+| `mdagent/worker.py` | 重分析后端（跑在分析 env）：编号识别、分段、微开关、TM6、配体保留、PLUMED 解析 |
+| `mdagent/gpcr_tasks.py` | 第 3/4/5 层：景观、不确定度、DCCM/MI、PSN、lead-lag、水网络、FES、A/B 对比 |
+| `mdagent/plot_style.py` | 共享出图排版原语（两套出图共用，风格强制一致） |
+| `mdagent/gpcr_plots.py` | GPCR 12 组分层图 |
+| `mdagent/ui.py` / `mdagent/ui.css` | 控制台外观层：Gradio 6 主题、设计系统 CSS、布局；业务回调由 `mdagent/agent.py` 传入 |
+| `mdagent/chainlit_app.py` | Chainlit 前端（另一套界面）：复用同一张图，把每个节点渲染成可展开的步骤；设置面板在左下角 |
+| `mdagent/manuals/md_docs/` | RAG 语料 |
 
 **为什么拆两个 env**：agent venv 只装 langchain/langgraph/gradio/mcp；MDAnalysis/scipy/sklearn
 在分析 env 里。工具层通过子进程调 worker，agent venv 不必背这些重依赖。
@@ -103,20 +103,20 @@ cp .env.example .env
 
 ```bash
 # Web 控制台（默认，http://0.0.0.0:7777；被占用时用 --port 换端口）
-python md_agent.py
+python mdagent/agent.py
 
 # 另一套前端：Chainlit（步骤式界面，端口自定）
-chainlit run md_chainlit.py --host 0.0.0.0 --port 7779
+chainlit run mdagent/chainlit_app.py --host 0.0.0.0 --port 7779
 
 # 跑 MD 模拟 + 基础分析
-python md_agent.py --mode cli --tpr step5_1.tpr --nsteps 5000000 --run-name md
+python mdagent/agent.py --mode cli --tpr step5_1.tpr --nsteps 5000000 --run-name md
 
 # 只对已有轨迹做 GPCR 分层分析（就地分析，不新建任务目录）
-python md_agent.py --mode cli --analyze-only \
+python mdagent/agent.py --mode cli --analyze-only \
     --ws /data2/JRK/md_workspaces/gpcr_test --traj md.xtc --run-name apo
 
 # 可选：A/B 对比（第二个体系必须已经跑过同样的分层分析）
-python md_agent.py --mode cli --analyze-only --ws /path/A --ws-b /path/B
+python mdagent/agent.py --mode cli --analyze-only --ws /path/A --ws-b /path/B
 ```
 
 MCP（接入 Claude Desktop / Cursor）：
@@ -124,7 +124,7 @@ MCP（接入 Claude Desktop / Cursor）：
 ```json
 {"mcpServers": {"md-agent": {
   "command": "/path/to/venv/bin/python",
-  "args": ["/abs/path/to/md_mcp_server.py"]}}}
+  "args": ["/abs/path/to/mdagent/mcp_server.py"]}}}
 ```
 
 ## 关键约定与坑（踩过并已修）
@@ -175,7 +175,7 @@ prep_check    生成 summary/prep_review.md 审查报告
 
 水模型：`tip3p`（CHARMM36 默认）/ `tip4p` / `tip4pew` / `tip5p` / `spc` / `spce`。
 
-`md_prep_defs.py` 里有兼容性检查：选了不自洽的组合（如 GAFF 配体配 CHARMM36 蛋白）
+`mdagent/prep_defs.py` 里有兼容性检查：选了不自洽的组合（如 GAFF 配体配 CHARMM36 蛋白）
 不会报错，但会出告警并写进审查报告。
 
 ### 审查报告

@@ -1,6 +1,6 @@
 # MD 体系准备工具层：蛋白-配体复合物 -> 可运行的 .tpr。
 #
-# 与 md_tools.py 的分工：md_tools 管"已有体系的模拟与分析"，
+# 与 tools.py 的分工：tools 管"已有体系的模拟与分析"，
 # 这里管"把体系造出来"。共用同一套工作区机制，产物直接喂给 run_gromacs_md。
 #
 # 三个实测撞出来的硬约束：
@@ -15,8 +15,8 @@ import subprocess
 
 from langchain_core.tools import tool
 
-from md_tools import GMX, _abs, current_workspace, get_workspace_path
-import md_prep_defs as P
+from tools import GMX, _abs, current_workspace, get_workspace_path
+import prep_defs as P
 
 
 _HERE = os.path.dirname(os.path.abspath(__file__))

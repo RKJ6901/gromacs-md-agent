@@ -1,4 +1,4 @@
-"""MD Agent MCP Server: 把 md_tools.py 的工具通过 MCP 暴露给 Claude Desktop / Cursor 等。
+"""MD Agent MCP Server: 把 tools.py 的工具通过 MCP 暴露给 Claude Desktop / Cursor 等。
 
 典型编排: create_task -> run_gromacs_md -> (等 .gro) -> prepare_analysis_index
 + merge_trajectories -> compute_rmsd/rmsf/gyrate/hbond -> plot_md_figures -> run_mmpbsa
@@ -10,7 +10,7 @@ import argparse
 import datetime
 import functools
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_ROOT)
 
 from dotenv import load_dotenv
@@ -21,7 +21,7 @@ _gmx_dir = os.path.dirname(_gmx_bin) if os.sep in _gmx_bin else ""
 if _gmx_dir:
     os.environ["PATH"] = _gmx_dir + os.pathsep + os.environ.get("PATH", "")
 
-from md_tools import (
+from tools import (
     read_file,
     check_logs,
     prepare_analysis_index,
@@ -55,7 +55,7 @@ from md_tools import (
     current_workspace,
 )
 
-from md_prep_tools import (
+from prep_tools import (
     prep_set_config,
     prep_protein_topology,
     prep_ligand_cgenff,
@@ -70,7 +70,7 @@ from md_prep_tools import (
     prep_build_membrane,
 )
 
-from md_decision_tools import (
+from decision_tools import (
     decide_protonation_scan,
     decide_apply_protonation,
     decide_charge_audit,

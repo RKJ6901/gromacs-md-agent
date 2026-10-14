@@ -12,4 +12,4 @@ NSTEPS="${NSTEPS:-}"
 RUN="${RUN:-md}"
 TRAJ="${TRAJ:-}"
 
-python md_agent.py --mode cli --tpr "$TPR" --nsteps "$NSTEPS" --run-name "$RUN" --traj "$TRAJ" --msg "请按顺序执行: 1.提交MD 2.建index并合并轨迹 3.算RMSD/RMSF/Rg/Hbond 4.出图"
+python mdagent/agent.py --mode cli --tpr "$TPR" --nsteps "$NSTEPS" --run-name "$RUN" --traj "$TRAJ" --msg "请按顺序执行: 1.提交MD 2.建index并合并轨迹 3.算RMSD/RMSF/Rg/Hbond 4.出图"

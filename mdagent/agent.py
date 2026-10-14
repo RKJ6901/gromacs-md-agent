@@ -14,7 +14,7 @@ import traceback
 import time
 from dotenv import load_dotenv
 
-from md_tools import current_workspace, get_workspace_path
+from tools import current_workspace, get_workspace_path
 
 load_dotenv()
 
@@ -28,7 +28,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 import gradio as gr
 
-from md_tools import (
+from tools import (
     read_file,
     check_logs,
     prepare_analysis_index,
@@ -61,7 +61,7 @@ from md_tools import (
     plot_gpcr_figures,
 )
 
-from md_prep_tools import (
+from prep_tools import (
     prep_set_config,
     prep_protein_topology,
     prep_ligand_cgenff,
@@ -76,7 +76,7 @@ from md_prep_tools import (
     prep_build_membrane,
 )
 
-from md_decision_tools import (
+from decision_tools import (
     decide_protonation_scan,
     decide_charge_audit,
     decide_ligand_params,
@@ -86,7 +86,7 @@ from md_decision_tools import (
     decide_review,
     DECISION_TOOLS,
 )
-import md_decision_defs as D
+import decision_defs as D
 
 # ==========================================
 # 1. 基础配置与模型初始化
@@ -1395,7 +1395,7 @@ def package_results(task_id):
 # ==========================================
 # 12. UI 主题
 # ==========================================
-# 主题、CSS、布局都在 md_ui.py（build_ui），这里不再单独定义 Gradio 主题
+# 主题、CSS、布局都在 ui.py（build_ui），这里不再单独定义 Gradio 主题
 
 
 # ==========================================
@@ -1571,7 +1571,7 @@ def run_cli(tpr_path, nsteps, run_name, traj_path, analyze_ws, ws_b, analyze_onl
 # ==========================================
 # 14. Gradio 页面构建
 # ==========================================
-from md_ui import build_ui, THEME, CSS
+from ui import build_ui, THEME, CSS
 
 demo = build_ui(submit_task, package_results)
 
@@ -1596,8 +1596,8 @@ if __name__ == "__main__":
     if args.mode == "cli":
         if not args.tpr and not args.analyze_only:
             print("错误: CLI 模式下必须提供 --tpr 参数（或加 --analyze-only 只做分析）")
-            print("示例: python md_agent.py --mode cli --tpr step5_1.tpr --nsteps 5000000 --run-name md")
-            print("示例: python md_agent.py --mode cli --analyze-only --traj md.xtc --run-name apo")
+            print("示例: python mdagent/agent.py --mode cli --tpr step5_1.tpr --nsteps 5000000 --run-name md")
+            print("示例: python mdagent/agent.py --mode cli --analyze-only --traj md.xtc --run-name apo")
             exit(1)
         run_cli(args.tpr, args.nsteps, args.run_name, args.traj, args.ws, args.ws_b, args.analyze_only, args.msg)
     else:

@@ -1,6 +1,6 @@
 """共享绘图层：GPCR Nature 风格排版原语。
 
-md_tools.py（xvg 基础图）与 md_gpcr_plots.py（GPCR 分层图）都从这里取样式，
+tools.py（xvg 基础图）与 gpcr_plots.py（GPCR 分层图）都从这里取样式，
 保证全项目出图规范一致（照 plot_aplnr_nature.py 的惯例）：
   - 细线框、去顶右脊、外向刻度
   - 字号 7-8.5pt，单栏宽 3.6 in

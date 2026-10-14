@@ -8,8 +8,10 @@ os.chdir('/data/JRK/md-agent')
 import matplotlib
 matplotlib.use('Agg')
 
-import md_agent as A
-from md_tools import current_workspace
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mdagent"))
+import agent as A
+from tools import current_workspace
 
 WS = sys.argv[1] if len(sys.argv) > 1 else '/data2/JRK/md_workspaces/gpcr_test'
 print('ws: ' + WS, flush=True)

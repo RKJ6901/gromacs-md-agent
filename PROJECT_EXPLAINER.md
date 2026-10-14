@@ -128,7 +128,7 @@
 服务器上最短的一条：
 
 ```bash
-cd /data/JRK/md-agent && ./venv/bin/python md_agent.py
+cd /data/JRK/md-agent && ./venv/bin/python mdagent/agent.py
 ```
 
 然后浏览器打开对应端口。界面上填几个路径，点提交。
@@ -136,7 +136,7 @@ cd /data/JRK/md-agent && ./venv/bin/python md_agent.py
 对已经跑过的轨迹做分析（不重新跑模拟）：
 
 ```bash
-cd /data/JRK/md-agent && ./venv/bin/python md_agent.py --mode cli --analyze-only \
+cd /data/JRK/md-agent && ./venv/bin/python mdagent/agent.py --mode cli --analyze-only \
     --ws /data2/JRK/md_workspaces/gpcr_test
 ```
 

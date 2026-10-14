@@ -1,8 +1,8 @@
 """GPCR 领域知识层：Ballesteros-Weinstein(BW) 通用编号、跨膜段定义、微开关残基。
 
 纯标准库实现（不 import numpy / MDAnalysis），因此可被两个不同 env 同时导入：
-  - agent venv 的 md_tools.py（出图 / 结论组织）
-  - 分析 env(gmxMMPBSA) 的 md_analysis_worker.py（几何计算）
+  - agent venv 的 tools.py（出图 / 结论组织）
+  - 分析 env(gmxMMPBSA) 的 worker.py（几何计算）
 
 编号来源优先级：
   1) 工作区 gpcr.json —— 人工或 agent 显式给出，可事后修正，最高优先级

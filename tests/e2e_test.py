@@ -1,6 +1,6 @@
 """MD agent Step2(GROMACS mdrun) + Step3(轨迹分析出图) 端到端短测。
 
-直接调用 md_tools 的 @tool（绕过 LLM，先验证机制），时长可控。
+直接调用 tools 的 @tool（绕过 LLM，先验证机制），时长可控。
 """
 import os
 import sys
@@ -8,7 +8,9 @@ import time
 import shutil
 
 sys.path.insert(0, "/data/JRK/md-agent")
-import md_tools as T
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mdagent"))
+import tools as T
 
 WS = "/data2/JRK/md_workspaces/e2e_test"
 SRC = "/data/real_JRK/888r_batch/OSSM_188503"

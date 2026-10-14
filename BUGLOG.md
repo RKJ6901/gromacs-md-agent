@@ -29,7 +29,7 @@
 **定位过程**：看执行日志，模型在第 5 步返回了**空的 `tool_calls`**。然后顺着出口条件边找：
 
 ```python
-# md_agent.py:183
+# agent.py:183
 def _llm_has_tool_call(state):
     last = state["messages"][-1]
     if isinstance(last, AIMessage) and last.tool_calls:
@@ -43,7 +43,7 @@ def _llm_has_tool_call(state):
 
 **根因**：把没有决策空间的步骤交给了 LLM。这几层顺序固定、参数全可省、路径自动解析——不需要判断。交给 LLM 只会引入一种新的失败模式：它可能什么都不调用，而且这种失败是静默的。
 
-**修法**：这一串（编号识别→第2/3/4/5 层→出图→A/B 对比）**全部改成确定性节点**。新建工厂 `_make_det_node`（`md_agent.py:226`），直接 `tool.invoke({})`，完全不进模型；顺序改成普通边硬编码：
+**修法**：这一串（编号识别→第2/3/4/5 层→出图→A/B 对比）**全部改成确定性节点**。新建工厂 `_make_det_node`（`agent.py:226`），直接 `tool.invoke({})`，完全不进模型；顺序改成普通边硬编码：
 
 ```python
 _chain = ["gpcr_setup", "gpcr_l2", "gpcr_l3", "gpcr_l4", "gpcr_l5",
@@ -69,13 +69,13 @@ LLM 只留在真正要理解用户输入的地方：提交模拟、检索文档�
 再看代码，两处凑成了这个 bug：
 
 ```python
-# md_agent.py:391 gpcr_compare_node：缺 ws_b 时正确跳过
+# agent.py:391 gpcr_compare_node：缺 ws_b 时正确跳过
 wsb = str(state.get("ws_b") or "").strip()
 if not wsb:
     note = "🔬 【A/B 对比】用户未提供对比工作区（ws_b），本步跳过。"
     return {"messages": [HumanMessage(content=note, ...)]}   # ← 不产生任何文件
 
-# md_agent.py:~860 build_gpcr_report：按"文件存在与否"读盘
+# agent.py:~860 build_gpcr_report：按"文件存在与否"读盘
 def _load_analysis(ws, task):
     p = os.path.join(ws, "analysis_%s.json" % task)
     if not os.path.exists(p):
@@ -87,7 +87,7 @@ def _load_analysis(ws, task):
 
 **根因**：一个「可能跳过」的步骤不产生输出，破坏了「报告 = 本次实测」这个不变量。读盘判据「文件在不在」无法区分「本轮产的」和「上轮留的」。
 
-**修法**：跳过时主动删掉陈旧产物（`md_agent.py:778`）：
+**修法**：跳过时主动删掉陈旧产物（`agent.py:778`）：
 
 ```python
 def _clear_compare_artifacts(ws):
@@ -108,7 +108,7 @@ def _clear_compare_artifacts(ws):
 
 **可迁移的经验**：多个产物里只要有**一个步骤可能跳过**，就不能用「文件是否存在」判断它是否属于本次运行。要么显式清理，要么给产物打上运行标识（时间戳、task_id）。
 
-**连带发现的第二个隐患**：修完这个之后又出了一次——报告里出现模型自己编的「A/B 对比…0/8 个指标显著」。根因是 `_sec_limits` 在「没有 compare」时什么都不输出，留了个空档，模型就补上了。修法是显式填死（`md_agent.py:1097`）：
+**连带发现的第二个隐患**：修完这个之后又出了一次——报告里出现模型自己编的「A/B 对比…0/8 个指标显著」。根因是 `_sec_limits` 在「没有 compare」时什么都不输出，留了个空档，模型就补上了。修法是显式填死（`agent.py:1097`）：
 
 ```python
 if not cp:
@@ -126,14 +126,14 @@ if not cp:
 
 **定位过程**：先怀疑模型乱来，于是去看路由逻辑。
 
-路由器是两层：第一层是 `_detect_mode`（`md_agent.py:574`）关键词扫描，命中就直接定意图；第二层才调 LLM 分 `query`/`chat`。所以先查 `MD_MARKERS` 里有什么——
+路由器是两层：第一层是 `_detect_mode`（`agent.py:574`）关键词扫描，命中就直接定意图；第二层才调 LLM 分 `query`/`chat`。所以先查 `MD_MARKERS` 里有什么——
 
 ```python
 MD_MARKERS = ["tpr", "step5_1", ".gro", "mdrun", "md 模拟", "分子动力学", "轨迹",
               "rmsd", "run_name", ...]
 ```
 
-里面有 `"run_name"`。再看 Chainlit 前端（`md_chainlit.py`）：
+里面有 `"run_name"`。再看 Chainlit 前端（`chainlit_app.py`）：
 
 ```python
 run_name = str(cfg.get("run_name") or "").strip() or "md"   # 默认值 "md"
@@ -149,7 +149,7 @@ prompt = A._build_prompt(tpr, nsteps, run_name, ...)
 
 **修法（两处）**：
 
-1. 只在用户真填了任务参数（tpr/步数/轨迹/工作区/对比/只分析）时才调 `_build_prompt`，否则把原话直接交给路由（`md_chainlit.py:70`）：
+1. 只在用户真填了任务参数（tpr/步数/轨迹/工作区/对比/只分析）时才调 `_build_prompt`，否则把原话直接交给路由（`chainlit_app.py:70`）：
 
 ```python
 has_task = bool(tpr or nsteps or traj or ws or ws_b or analyze_only)

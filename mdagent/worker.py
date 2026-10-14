@@ -1,7 +1,7 @@
 """GPCR / 元动力学 重分析后端 worker。
 
 在【分析 env(gmxMMPBSA: MDAnalysis 2.7 + scipy + sklearn)】里运行，被 agent venv
-的 md_tools._py_analysis() 以子进程方式调用。
+的 tools._py_analysis() 以子进程方式调用。
 
 为什么单独一个 worker：
   1) MDAnalysis 2.7 读不了 GROMACS 2026 的 tpr(tpx version 138)，所以拓扑一律
@@ -9,7 +9,7 @@
   2) agent venv 里没有 scipy/sklearn/MDAnalysis。重的几何与统计放这里，agent
      venv 只保留 matplotlib 与编排逻辑。
 
-CLI: python md_analysis_worker.py <task> --ws <workspace> [--json '<payload>']
+CLI: python worker.py <task> --ws <workspace> [--json '<payload>']
 输出: stdout 单行 JSON，形如 {"ok": true, ...} 或 {"ok": false, "error": "..."}
 """
 import argparse
@@ -628,21 +628,21 @@ def task_segments(ws, p):
 
 # ================================================================ CLI
 def _tasks():
-    """收集所有任务：本模块的 task_* + md_gpcr_tasks 的。
+    """收集所有任务：本模块的 task_* + gpcr_tasks 的。
 
-    md_gpcr_tasks 在模块级 import 本模块，所以这里必须延迟导入，否则循环导入。
+    gpcr_tasks 在模块级 import 本模块，所以这里必须延迟导入，否则循环导入。
     """
     t = {}
     for k, v in list(globals().items()):
         if k.startswith('task_') and callable(v):
             t[k[5:]] = v
     try:
-        import md_gpcr_tasks as X
+        import gpcr_tasks as X
         for k, v in list(vars(X).items()):
             if k.startswith('task_') and callable(v):
                 t.setdefault(k[5:], v)
     except Exception as e:
-        sys.stderr.write('warn: md_gpcr_tasks 未加载: %s\n' % e)
+        sys.stderr.write('warn: gpcr_tasks 未加载: %s\n' % e)
     return t
 
 

@@ -1,11 +1,11 @@
 """GPCR / 元动力学 高层分析任务（第 3/4/5 层）。
 
-与 md_analysis_worker.py 分开的原因：
+与 worker.py 分开的原因：
   worker 里的 Session、几何/统计助手（superpose、kabsch_rot、block_bootstrap_ci、
   autocorr_ess、write_csv、_sel_tensor、parse_plumed、monotonic_segments）都在单个
   append 里越堆越大、容易写坏；把任务级逻辑单独成文件，基础设施只导入不重写。
 
-本模块只依赖 md_analysis_worker 的公共助手 + numpy/scipy/sklearn，不重复实现。
+本模块只依赖 worker 的公共助手 + numpy/scipy/sklearn，不重复实现。
 所有任务签名统一为 task_xxx(ws: str, p: dict) -> dict，由 worker 的 CLI 分发。
 """
 import os
@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 
 import gpcr_defs as G
-import md_analysis_worker as W
+import worker as W
 
 Session = W.Session
 write_csv = W.write_csv

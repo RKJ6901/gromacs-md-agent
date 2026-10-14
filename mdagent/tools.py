@@ -1,6 +1,6 @@
 """MD Agent 领域工具层：GROMACS 模拟 + MD 轨迹后处理分析。
 
-工具全部为 LangChain @tool，被 md_agent.py（LangGraph）与 md_mcp_server.py（MCP）共用。
+工具全部为 LangChain @tool，被 agent.py（LangGraph）与 mcp_server.py（MCP）共用。
 工作区用 contextvars 隔离，与 rosetta/boltz agent 同一套机制。
 """
 import os
@@ -451,12 +451,12 @@ def run_mmpbsa(tpr_path: str = "step5_1.tpr", traj_path: str = "merged.xtc",
 
 
 # ==========================================
-# 6. GPCR Nature 风格出图（风格原语见 md_plot_style.py，与 GPCR 分层出图共用）
+# 6. GPCR Nature 风格出图（风格原语见 plot_style.py，与 GPCR 分层出图共用）
 # ==========================================
-from md_plot_style import (  # noqa: E402
+from plot_style import (  # noqa: E402
     INK, GREY, COLORS, setup_style, clean, panel, save,
 )
-import md_gpcr_plots as _GP  # noqa: E402
+import gpcr_plots as _GP  # noqa: E402
 
 
 def _read_xvg(path):
@@ -616,11 +616,11 @@ def auto_repair() -> str:
 # ==========================================
 # 8. RAG 文档检索工具（GROMACS 命令/分析说明）
 # ==========================================
-DOCS_DIR = os.path.join("md_manuals", "md_docs")
+DOCS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manuals", "md_docs")
 
 
 def _load_doc_chunks():
-    """加载 md_manuals/md_docs 下全部 .txt/.md 语料并切块。"""
+    """加载 manuals/md_docs 下全部 .txt/.md 语料并切块。"""
     docs = []
     for root, _dirs, files in os.walk(DOCS_DIR):
         for fn in sorted(files):
@@ -643,7 +643,7 @@ def init_bm25_retriever():
         from langchain_community.retrievers import BM25Retriever
         splits = _load_doc_chunks()
         if not splits:
-            print("⚠️ RAG：md_manuals/md_docs 下未找到语料，检索不可用")
+            print("⚠️ RAG：manuals/md_docs 下未找到语料，检索不可用")
             return None
         return BM25Retriever.from_documents(splits, k=4)
     except Exception as e:
@@ -703,7 +703,7 @@ def search_md_docs(query: str) -> str:
         except Exception:
             docs = []
     if not docs:
-        return "【检索结果】MD 知识库中未找到相关内容（请检查 md_manuals/md_docs 语料）。"
+        return "【检索结果】MD 知识库中未找到相关内容（请检查 manuals/md_docs 语料）。"
     context = "\n---\n".join(d.page_content[:1500] for d in docs)
     return f"【检索成功·{source}】以下是 GROMACS/MD 知识库的参考资料：\n{context}"
 
@@ -715,7 +715,7 @@ def search_md_docs(query: str) -> str:
 _DEF_ANALYSIS_PY = '/opt/gromacs/bin/python'
 ANALYSIS_PY = os.getenv('MD_ANALYSIS_PY', _DEF_ANALYSIS_PY)
 _HERE = os.path.dirname(os.path.abspath(__file__))
-WORKER_PY = os.getenv('MD_WORKER_PY', os.path.join(_HERE, 'md_analysis_worker.py'))
+WORKER_PY = os.getenv('MD_WORKER_PY', os.path.join(_HERE, 'worker.py'))
 
 # analyze_uncertainty 不传 series 时的默认指标集（跨受体通用：两个保守盐桥/开关 + TM6 间隙 + 配体）
 _DEF_UNC_SERIES = ('microswitch_DRY.csv:3.49-3.50,microswitch_CWxP.csv:6.48 chi1,'

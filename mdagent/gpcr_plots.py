@@ -1,7 +1,7 @@
 """GPCR / 元动力学分析出图：读 worker 写出的 CSV/JSON，产出 Nature 风格多面板图。
 
 设计原则：
-  - 与 md_tools.plot_md_figures 共用 md_plot_style 的排版规范（细线、去脊、600dpi）
+  - 与 tools.plot_md_figures 共用 plot_style 的排版规范（细线、去脊、600dpi）
   - 每个 figure family 独立取数：缺哪个 CSV 就跳过该 family 并写明原因，
     绝不因为缺一块数据就整组不出图（元动力学分析里 PLUMED 数据经常缺失）
   - 图里凡是有"均值"的地方都尽量带上 CI/ESS 或时间序列，避免只给一个数
@@ -14,7 +14,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-import md_plot_style as S
+import plot_style as S
 
 SEG_ORDER = ['Nterm', 'TM1', 'ICL1', 'TM2', 'ECL1', 'TM3', 'ICL2', 'TM4',
              'ECL2', 'TM5', 'ICL3', 'TM6', 'ECL3', 'TM7', 'H8', 'Cterm']

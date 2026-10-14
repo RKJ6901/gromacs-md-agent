@@ -1,18 +1,18 @@
 # 决策层·证据与执行：把真实文件解析成数字，交给策略层判定，落进决策账本。
 #
-# 与 md_decision_defs.py 的分工：
+# 与 decision_defs.py 的分工：
 #   defs 里只有阈值表与判定逻辑（纯标准库，谁都能复算）；
 #   这里负责「把文件读成证据」和「把判定写下来 / 执行下去」。
 #
 # 三条实测逼出来的约束：
-#  1. 两者不能互相 import：本模块 import md_prep_tools，md_prep_tools 绝不能再
+#  1. 两者不能互相 import：本模块 import prep_tools，prep_tools 绝不能再
 #     import 本模块，否则循环。策略层只认 evidence 字典，与本层解耦。
 #  2. 证据必须从文件解析出来，宁可缺项（返回「没找到文件」并跳过落账），
 #     也不能凭感觉编一个数写进账本 —— 编出来的数后面没人能反证。
 #  3. 判定不是终点：ESCALATE 的判定要在返回串最前面打「需要你定夺」标记，
 #     图靠这个前缀决定停下来问人。所以账本与返回串用同一套 marker。
 #
-# 纯标准库 import（numpy/MDAnalysis 一律走 md_tools 的 _py_tool 子进程），
+# 纯标准库 import（numpy/MDAnalysis 一律走 tools 的 _py_tool 子进程），
 # 与 gpcr_defs.py 同定位，两个 env 都能加载。
 import os
 import re
@@ -21,9 +21,9 @@ import glob
 
 from langchain_core.tools import tool
 
-from md_tools import GMX, _abs, current_workspace, get_workspace_path, _py_tool
-import md_prep_tools as PT
-import md_decision_defs as D
+from tools import GMX, _abs, current_workspace, get_workspace_path, _py_tool
+import prep_tools as PT
+import decision_defs as D
 
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +43,7 @@ ION_MOLNAMES = ("NA", "CL", "SOD", "CLA", "K", "MG", "CA")
 
 
 # ---------------------------------------------------------------------------
-# 一、共享助手（与 md_prep_tools 同一套工作区机制）。
+# 一、共享助手（与 prep_tools 同一套工作区机制）。
 # ---------------------------------------------------------------------------
 def _ws():
     return os.path.abspath(current_workspace.get())

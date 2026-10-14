@@ -1,13 +1,13 @@
 """MD Agent 控制台外观层：主题、CSS、布局。
 
-只负责画界面并接好回调，不含业务逻辑：提交与打包两个回调由 md_agent.py 传入。
+只负责画界面并接好回调，不含业务逻辑：提交与打包两个回调由 agent.py 传入。
 配色沿用分析出图的同一套色（青色主色 + 暖棕辅色），让控制台和图看着是一套东西。
 """
 import os
 
 import gradio as gr
 
-_CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "md_ui.css")
+_CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.css")
 
 
 def _load_css() -> str:
@@ -40,7 +40,7 @@ HEADER_HTML = """
 CSS = _load_css()
 THEME = _theme()
 
-import md_prep_defs as _P
+import prep_defs as _P
 
 
 def _choices(d):
@@ -63,7 +63,7 @@ def build_ui(submit_fn, fetch_fn):
     """画控制台，并把 submit_fn / fetch_fn 接到按钮上。
 
     Gradio 6 把 theme / css 移到了 launch()：这里只建 Blocks，
-    调用方 launch 时传 md_ui.THEME / md_ui.CSS。
+    调用方 launch 时传 ui.THEME / ui.CSS。
     """
     with gr.Blocks(title="MD Agent 控制台") as demo:
         gr.HTML(HEADER_HTML)
