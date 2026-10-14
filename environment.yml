@@ -1,0 +1,17 @@
+name: md-agent
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - python-dotenv
+      - matplotlib
+      - langchain
+      - langchain-community
+      - langchain-openai
+      - langchain-text-splitters
+      - langgraph
+      - gradio
+      - mcp

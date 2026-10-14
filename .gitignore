@@ -1,0 +1,41 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# CLI rules
+.clinerules/
+.clinerules/**
+
+# Output / build artifacts
+output/
+build/
+dist/
+*.egg-info/
+chroma_db/
+*.zip
+
+# MD trajectories / binary (large)
+*.xtc
+*.trr
+*.edr
+*.tpr
+*.cpt
+*.gro
+
+# Gradio cache
+.gradio/
+
+# Local backups
+*.bak
+*.mock_backup
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

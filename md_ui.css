@@ -1,0 +1,105 @@
+/* MD Agent 控制台样式：纸白底 + 单一青色主色 + 暖棕辅色，与出图同一套色。
+   覆盖 Gradio 主题变量为主，自定义类只用于页头与少量细节。 */
+
+:root, .gradio-container {
+  --body-background-fill: #F5F6F5;
+  --background-fill-primary: #FFFFFF;
+  --block-background-fill: #FFFFFF;
+  --block-border-color: #DFE3E1;
+  --block-border-width: 1px;
+  --block-radius: 8px;
+  --block-shadow: none;
+  --border-color-primary: #DFE3E1;
+  --body-text-color: #1B1D1E;
+  --body-text-color-subdued: #6A7175;
+  --input-background-fill: #FFFFFF;
+  --input-border-color: #CBD4D2;
+  --button-primary-background-fill: #15707B;
+  --button-primary-background-fill-hover: #0D545E;
+  --button-primary-text-color: #FFFFFF;
+  --button-secondary-background-fill: #FFFFFF;
+  --button-secondary-background-fill-hover: #EDF3F2;
+  --button-secondary-text-color: #15707B;
+  --button-secondary-border-color: #C6D2D0;
+  --button-large-radius: 8px;
+  --button-small-radius: 8px;
+  --radius-lg: 8px;
+  --font: 'Fira Sans', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, Consolas, monospace;
+}
+
+body {
+  background: #F5F6F5;
+}
+
+.gradio-container {
+  max-width: 1240px !important;
+  margin: 0 auto;
+  background: transparent;
+}
+
+.md-head {
+  padding: 2px 2px 14px;
+  border-bottom: 1px solid #DFE3E1;
+  margin-bottom: 16px;
+}
+
+.md-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.md-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #15707B;
+  box-shadow: 0 0 0 4px rgba(21, 112, 123, 0.12);
+}
+
+.md-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.md-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6A7175;
+}
+
+.md-sub {
+
+/* 日志与状态用等宽，便于对齐路径和数字 */
+#md-log textarea,
+#md-log .message,
+#md-status textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* 页签：选中态用主色下划线 */
+.gradio-container .tab-nav button.selected {
+  color: #15707B;
+  border-bottom-color: #15707B;
+}
+
+/* 键盘可达性 */
+.gradio-container :focus-visible {
+  outline: 2px solid #15707B;
+  outline-offset: 2px;
+}
+
+/* 按钮过渡，避免布局抖动 */
+.gradio-container button {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gradio-container button {
+    transition: none;
+  }
+}
