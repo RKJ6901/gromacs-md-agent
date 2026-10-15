@@ -87,7 +87,7 @@ router ─(pipeline)─> pipeline 子图 ─> parse_results ─> gpcr_report ─
 - MD 四步任一步报错进 repair 分支：读日志判断原因，修好后回到出错那步重来，`retry_count` 超过 2 才真退出。
 - 五段式结论骨架（`gpcr_report`，确定性、不调 LLM）：每个数字都直接取自分析 JSON，summarize 只负责按骨架组织语言；第五节"产出清单"直接 `glob` 磁盘，用来堵死"LLM 凭空说出图失败"。
 - 诚实性硬约束（写进骨架而非祈祷模型自觉）：报均值前给分块 bootstrap 95% CI 与有效样本量 ESS（ESS<50 的均值标注不可信）；FES 结论先看收敛（`rms_centered` 是否随块长趋稳），未收敛不得报自由能深度与势垒；测不到的位点进 `missing_measurements`，不编造残基。
-- progress_poll 纯确定性轮询 `.gro`，不消耗 LLM；MemorySaver 断点续跑；超长工具结果首尾截断。
+- progress_poll 纯确定性轮询 `.gro`，不消耗 LLM；SQLite 断点续跑（状态落盘，进程重启后仍在）；超长工具结果首尾截断。
 
 ## 3. 流水线三段
 
@@ -293,6 +293,9 @@ GMX_MMPBSA_BIN=/opt/gromacs/bin/gmx_MMPBSA
 # 重分析用的 python（装了 MDAnalysis / scipy / sklearn）
 MD_ANALYSIS_PY=/path/to/analysis-env/bin/python
 
+# LangGraph 断点状态库（默认 <仓库根>/checkpoints.sqlite）
+MD_CHECKPOINT_DB=/path/to/checkpoints.sqlite
+
 # 配体赋参（只有体系准备需要）
 PREP_CONVERTER_PY=/opt/conda/bin/python
 PREP_CGENFF_CONVERTER=/data/opt-bk/opt/PyAutoFEP/Tools/cgenff_charmm2gmx_py3.py
@@ -371,7 +374,7 @@ bash run_cli.sh
 - 判断层的真值校验只做了 7W0M 一个体系（CHARMM-GUI 的净电荷 +7、二硫键 Cys102–Cys181、组氨酸全 HSD）。
 - 只在 GROMACS 2026.2 上验证过。
 - 等待模拟完成的轮询上限是 30 秒 × 120 次（约 1 小时），更长的模拟需要手动重试。
-- 断点续跑依赖 MemorySaver，进程重启后不保留。
+- 断点续跑的状态现在持久化到 SQLite 文件，进程重启后仍在（路径由 `MD_CHECKPOINT_DB` 指定，默认 `<仓库根>/checkpoints.sqlite`），多路并发共用一个文件。但恢复的只是图的状态：后台 `gmx mdrun` 这类未完成的子进程本身不会自动接着跑。
 - 没有自动化测试套件；`tests/` 下是端到端脚本，需要真实数据才能跑。
 
 ## 11. 致谢

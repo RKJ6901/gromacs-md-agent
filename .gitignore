@@ -20,6 +20,12 @@ dist/
 chroma_db/
 *.zip
 
+# LangGraph SQLite checkpoints (runtime state)
+checkpoints.sqlite
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
 # MD trajectories / binary (large)
 *.xtc
 *.trr

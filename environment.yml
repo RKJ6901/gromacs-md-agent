@@ -13,5 +13,6 @@ dependencies:
       - langchain-openai
       - langchain-text-splitters
       - langgraph
+      - langgraph-checkpoint-sqlite
       - gradio
       - mcp

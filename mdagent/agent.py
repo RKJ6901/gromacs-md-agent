@@ -12,6 +12,7 @@ import zipfile
 import datetime
 import traceback
 import time
+import sqlite3
 from dotenv import load_dotenv
 
 from tools import current_workspace, get_workspace_path
@@ -25,7 +26,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, Tool
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 import gradio as gr
 
 from tools import (
@@ -1374,8 +1375,20 @@ workflow.add_edge("reply_tools", "reply")
 workflow.add_edge("summarize", END)
 
 
-memory = MemorySaver()
-agent_executor = workflow.compile(checkpointer=memory)
+# 断点续跑的状态现在持久化到 SQLite 文件，进程重启后仍在（不再是 MemorySaver 的内存态）；
+# DB 路径由环境变量 MD_CHECKPOINT_DB 指定，默认 <仓库根>/checkpoints.sqlite。
+def _build_checkpointer():
+    """返回 (sqlite3 连接, SqliteSaver)；连接须存活到进程结束，否则 checkpoint 写入会静默失败。"""
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_path = os.getenv("MD_CHECKPOINT_DB") or os.path.join(repo_root, "checkpoints.sqlite")
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+    conn = sqlite3.connect(db_path, check_same_thread=False)  # Gradio 多线程访问
+    conn.execute("PRAGMA journal_mode=WAL")  # 并发读写
+    return conn, SqliteSaver(conn)
+
+
+_checkpointer_conn, checkpointer = _build_checkpointer()
+agent_executor = workflow.compile(checkpointer=checkpointer)
 
 
 # 11. 打包任务产物为 zip
