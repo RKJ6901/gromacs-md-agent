@@ -97,7 +97,7 @@ def _body(submit_fn, fetch_fn):
                 with gr.Row():
                     salt_in = gr.Dropdown(label='盐类型', choices=['NaCl', 'KCl', 'MgCl2'], value='NaCl')
                     conc_in = gr.Number(label='浓度 M', value=0.15)
-                membrane_in = gr.Checkbox(label='建膜（本地 packmol 插膜）', value=False)
+                membrane_in = gr.Checkbox(label='建膜（本地晶格双层插入）', value=False)
                 lipid_in = gr.Dropdown(label='脂质类型', choices=LIPID_CHOICES, value='POPC')
             traj_input = gr.Textbox(label="分析轨迹 (.xtc)", lines=2, placeholder="step5_1.xtc,step5_2.xtc", info="多段用逗号分隔")
             user_input = gr.Textbox(label="附加指令（可选）", lines=1, placeholder="例如：起点时间 0,20000")

@@ -33,15 +33,11 @@ CONVERTER = os.getenv(
     "/data/opt-bk/opt/PyAutoFEP/Tools/cgenff_charmm2gmx_py3.py",
 )
 ACPYPE = os.getenv("PREP_ACPYPE", "/opt/conda/envs/ambertools/bin/acpype")
-# acpype 与它依赖的 obabel/antechamber/sqm 同在 gmx env，需要把它加进 PATH。
-ACPYPE_BIN_DIR = os.path.dirname(ACPYPE)
 # acpype 内部要调 antechamber -> sqm（半经验量化，一个配体要跑几分钟）。
 # 直接调会因缺 AmberTools 的环境变量而秒退（Cannot properly run sqm），
 # 必须用 conda run 把整个 env 的环境带上才跑得动。
 CONDA = os.getenv("PREP_CONDA", "/opt/conda/bin/conda")
-PACKMOL = os.getenv("PREP_PACKMOL", "/opt/conda/envs/ambertools/bin/packmol")
 ACPYPE_ENV = os.getenv("PREP_ACPYPE_ENV", "gmx")
-ACPYPE_CMD = ACPYPE + " -i %s -b LIG -n 0 -a gaff2 -o gmx"
 
 
 
@@ -778,7 +774,7 @@ def prep_review() -> str:
 # 脂质分布对称化，本流程只做几何摆放 + 最小化输入生成。所以产出的是"待平衡的
 # 初始结构"，不是可用的膜体系 —— 审查报告里会把它写成硬结论。
 #
-# 设计参照 gromacs-electrolyte-workflow 的 Packmol 门禁：
+# 设计参照 gromacs-electrolyte-workflow 的门禁做法：
 # 固定随机种子、明确分子数、记录请求盒子与最小距离、输入输出留痕。
 # ---------------------------------------------------------------
 
@@ -934,7 +930,7 @@ def _read_gro(p):
 
 def _pdb_atom(serial, name, resname, resseq, x, y, z):
     # 按列定位写 PDB 行。不能用 %3s 拼：Python 的字符串宽度只补齐不截断，
-    # 4 字符的 POPC 会把后面的列整体推歪，packmol 直接拒绝读。
+    # 4 字符的 POPC 会把后面的列整体推歪，坐标列错位会让下游解析不了。
     s = [" "] * 66
     s[0:6] = list("ATOM  ")
     s[6:11] = list("%5d" % int(serial))
@@ -1048,30 +1044,6 @@ def _orient_protein(src_pdb, dst_pdb):
     return R, "跨膜束主轴与 z 轴夹角 %.1f°，已对齐；用了 %d 条螺旋" % (tilt, len(axes))
 
 
-def _pack_bilayer(popc_pdb, n_per_leaflet, box_xy, seed, workdir):
-    # 用 packmol 摆两层 POPC。固定种子 + 明确分子数（参照 electrolyte skill 的门禁要求）。
-    # popc.pdb 的头基在高 z、尾在低 z，所以下层要把 z 取反。
-    pack = os.path.join(workdir, "packmol.in")
-    out = os.path.join(workdir, "membrane_raw.pdb")
-    half = box_xy / 2.0
-    z_head, z_tail = 20.0, 2.0
-    with open(pack, "w", encoding="utf-8") as f:
-        f.write("tolerance 2.0\n")
-        f.write("seed %d\n" % int(seed))
-        f.write("filetype pdb\n")
-        f.write("output %s\n\n" % out)
-        for tag, zlo, zhi in (("upper", z_tail, z_head), ("lower", -z_head, -z_tail)):
-            f.write("structure %s\n" % popc_pdb)
-            f.write("  number %d\n" % int(n_per_leaflet))
-            f.write("  inside box %.3f %.3f %.3f %.3f %.3f %.3f\n" % (
-                -half, -half, zlo, half, half, zhi))
-            f.write("  constrain_rotation x 0. 0.\n")
-            f.write("  constrain_rotation y 0. 0.\n")
-            f.write("  constrain_rotation z 0. 0.\n")
-            f.write("end structure\n\n")
-    return pack, out
-
-
 @tool
 def prep_orient_protein(protein_pdb="") -> str:
     """【准备·膜·定向】用跨膜螺旋束主轴把蛋白摆正（轴对齐 z），供插膜使用。
@@ -1117,18 +1089,18 @@ def prep_orient_protein(protein_pdb="") -> str:
 
 @tool
 def prep_build_membrane(n_per_leaflet=0, seed=12345, clash_cutoff=1.8) -> str:
-    """【准备·膜·建膜】用 packmol 摆 POPC 双层，并剔除与蛋白冲突的脂质。
+    """【准备·膜·建膜】用晶格摆放 POPC 双层，并剔除与蛋白冲突的脂质。
 
     产出 membrane.pdb（蛋白 + 脂质）。**这是待平衡的初始结构，不是可用的膜体系**：
     本流程只做几何摆放，不做 CHARMM-GUI 那样的多轮平衡、取向优化与脂质对称化。
     这两个事实会写进审查报告，不会藏在日志里。
 
-    这里的做法参照 gromacs-electrolyte-workflow 的 Packmol 门禁：
+    这里的做法参照 gromacs-electrolyte-workflow 的门禁做法：
     固定随机种子、明确分子数、记录实际盒子和最小距离。
 
     Args:
         n_per_leaflet: 每层脂质数；0 表示按蛋白横截面自动估算
-        seed: packmol 随机种子（固定以保证可复现）
+        seed: 晶格摆位随机种子（固定以保证可复现）
         clash_cutoff: 脂质-蛋白最小距离阈值（Å），低于它视为冲突并剔除该脂质
     """
     cfg = _load_json(PREP_CFG)
@@ -1223,7 +1195,7 @@ def prep_build_membrane(n_per_leaflet=0, seed=12345, clash_cutoff=1.8) -> str:
     _log("build_membrane", True,
          "请求每层 %d，实际保留 %d，剔除 %d；盒子 %.1f A；最小脂质-蛋白距离 %.2f A"
          % (n_per_leaflet, len(kept), dropped, box_xy, dmin_all))
-    _warn("膜为本地 packmol 几何摆放：未做多轮平衡、蛋白取向优化、脂质对称化。"
+    _warn("膜为本地晶格几何摆放：未做多轮平衡、蛋白取向优化、脂质对称化。"
           "这是待平衡的初始结构，不是可用的膜体系。")
     return ("【膜已搭建】membrane.pdb\n"
             "每层请求 %d，实际保留 %d，与蛋白冲突剔除 %d\n"
