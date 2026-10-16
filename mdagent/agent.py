@@ -12,6 +12,9 @@ import zipfile
 import datetime
 import traceback
 import time
+import asyncio
+import threading
+import contextvars
 import sqlite3
 from dotenv import load_dotenv
 
@@ -1389,6 +1392,45 @@ def _build_checkpointer():
 
 _checkpointer_conn, checkpointer = _build_checkpointer()
 agent_executor = workflow.compile(checkpointer=checkpointer)
+
+
+async def astream_sync(sync_iter):
+    """把同步生成器桥接成异步迭代器。
+
+    图是用同步 SqliteSaver 编译的，LangGraph 的 aput() 对 async 调用直接
+    raise NotImplementedError，所以 Chainlit 那条 async 路径不能直接 astream。
+    这里把同步流放到工作线程里跑、事件经队列送回事件循环：既保住一套 checkpointer，
+    也避免用 AsyncSqliteSaver 之后 Gradio/CLI 的同步调用反过来报 InvalidStateError。
+    """
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+    _DONE = object()  # 唯一哨兵：不能用 None，生成器可能 yield 出合法的假值事件
+    # 在调用方（事件循环线程）拷一份 context。async handler 里 set 的 current_workspace
+    # 等 ContextVar 必须让工作线程里跑的图看得见，否则工作区会解析到错误目录。
+    ctx = contextvars.copy_context()
+
+    def _drain():
+        # 整个迭代都在 ctx 里跑，图节点读取 current_workspace 才能拿到 async 侧设的值。
+        for item in sync_iter:
+            loop.call_soon_threadsafe(queue.put_nowait, (item, None))
+
+    def _producer():
+        try:
+            ctx.run(_drain)
+            loop.call_soon_threadsafe(queue.put_nowait, (_DONE, None))
+        except BaseException as exc:  # 图里逃出来的异常原样带回消费协程再抛
+            loop.call_soon_threadsafe(queue.put_nowait, (None, exc))
+
+    threading.Thread(target=_producer, daemon=True).start()
+
+    while True:
+        item, exc = await queue.get()
+        if exc is not None:
+            raise exc
+        if item is _DONE:
+            return
+        yield item
+
 
 
 # 11. 打包任务产物为 zip

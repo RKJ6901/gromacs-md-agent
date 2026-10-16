@@ -374,7 +374,7 @@ bash run_cli.sh
 - 判断层的真值校验只做了 7W0M 一个体系（CHARMM-GUI 的净电荷 +7、二硫键 Cys102–Cys181、组氨酸全 HSD）。
 - 只在 GROMACS 2026.2 上验证过。
 - 等待模拟完成的轮询上限是 30 秒 × 120 次（约 1 小时），更长的模拟需要手动重试。
-- 断点续跑的状态现在持久化到 SQLite 文件，进程重启后仍在（路径由 `MD_CHECKPOINT_DB` 指定，默认 `<仓库根>/checkpoints.sqlite`），多路并发共用一个文件。但恢复的只是图的状态：后台 `gmx mdrun` 这类未完成的子进程本身不会自动接着跑。
+- 断点续跑的状态现在持久化到 SQLite 文件，进程重启后仍在（路径由 `MD_CHECKPOINT_DB` 指定，默认 `<仓库根>/checkpoints.sqlite`），多路并发共用一个文件。但恢复的只是图的状态：后台 `gmx mdrun` 这类未完成的子进程本身不会自动接着跑。Gradio / CLI 直接走同步 `agent_executor.stream(...)`；Chainlit 前端是 async 路径，经 `agent.py` 的 `astream_sync` 线程桥到达同一个同步 checkpointer（`AsyncSqliteSaver` 会反过来拒绝同线程的同步调用，所以不采用）。
 - 没有自动化测试套件；`tests/` 下是端到端脚本，需要真实数据才能跑。
 
 ## 11. 致谢

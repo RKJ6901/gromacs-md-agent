@@ -168,7 +168,7 @@ async def _message(msg: cl.Message):
     init = {"messages": [SystemMessage(content=A.SYS_RULE), HumanMessage(content=prompt)]}
     answer = ""
     try:
-        async for event in A.agent_executor.astream(init, config, stream_mode="updates"):
+        async for event in A.astream_sync(A.agent_executor.stream(init, config, stream_mode="updates")):
             for node, st in (event or {}).items():
                 msgs = (st or {}).get("messages") or []
                 if not msgs:

@@ -386,6 +386,8 @@ agent_executor = workflow.compile(checkpointer=checkpointer)
 
 每个节点走完都存一次状态，落盘到 `MD_CHECKPOINT_DB` 指定的 SQLite 文件（默认 `<仓库根>/checkpoints.sqlite`）。恢复时给同一个 `thread_id`，它从断点接着跑——**进程重启后也一样**（早期用的内存版 `MemorySaver` 做不到这点，已换成 `SqliteSaver`）。
 
+这套 checkpointer 是**同步的**，只服务同步调用：Gradio / CLI 走 `agent_executor.stream(...)` 没问题，但 Chainlit 那条 async 路径若直接 `astream(...)`，`SqliteSaver.aput()` 会 raise `NotImplementedError`（这就是 BUG-18）。反过来换成 `AsyncSqliteSaver` 又会让同线程里的同步调用报 `InvalidStateError`，而图的节点本来就全是同步的（subprocess、文件 IO），没必要拆两套。所以 Chainlit 走 `agent.py` 的 `astream_sync`：把同步流放到工作线程里跑、事件经队列送回事件循环，并用 `contextvars.copy_context()` 把 async handler 设的 `current_workspace` 带进去——**一套 checkpointer 服务全部入口**。
+
 ### 边界（重要，主动讲）
 
 状态现在落盘，进程重启后仍在，但要注意恢复的是**编排状态**而非**被中断的计算**：

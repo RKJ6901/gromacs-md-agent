@@ -332,6 +332,33 @@ if is_task:
 
 ---
 
+## BUG-18 一次模块级 `compile()` 只认一种执行模型：加持久化 checkpointer 修好了 Gradio、却弄坏了 Chainlit
+
+**现象**：Chainlit 前端（7779）发出任何一条消息都报 `执行出错：…`，异常是 `NotImplementedError: The SqliteSaver does not support async methods. Consider using AsyncSqliteSaver instead.`。这条是**潜伏**的——换成 SQLite checkpointer 之后没有真正从 Chainlit 跑过一次，直到启动时刷出一条 Warning 才引出来。
+
+**定位过程**：图只在 `agent.py` 模块级编译**一次**，三个前端共用同一个 `agent_executor`：
+
+```python
+_checkpointer_conn, checkpointer = _build_checkpointer()   # 同步 SqliteSaver
+agent_executor = workflow.compile(checkpointer=checkpointer)
+```
+
+调用方有三条，执行模型却不一致：
+
+- Gradio `submit_task` → `agent_executor.stream(...)`（同步）
+- CLI `run_cli` → `agent_executor.stream(...)`（同步）
+- Chainlit `_message` → `agent_executor.astream(...)`（async）
+
+`langgraph.checkpoint.sqlite.SqliteSaver.aput()` 对 async 调用**直接 raise `NotImplementedError`**。之前用内存版 `MemorySaver` 时三条路都不写盘、也都不报错；换成 `SqliteSaver` 后，只有真正走 `astream` 的那条（Chainlit）会触发 `aput()`。改完只回归了 Gradio/CLI，async 那条一直没人走。服务器上实测确认：同一张图 `SqliteSaver` + `astream` 抛，`AsyncSqliteSaver` + `astream` 通过。
+
+**根因**：**一次模块级 `compile()` 静默假设了一种执行模型。** checkpointer 选型是给整张图定的，但用图的调用方不止一个、同步/异步不统一。加持久化修好了同步路径，却把 async 路径打断了——而且不报错、是潜伏的，因为没有一个受控入口去跑它。
+
+**修法**：不换 `AsyncSqliteSaver`——实测它反过来拒绝**同线程的同步调用**（`InvalidStateError: Synchronous calls to AsyncSqliteSaver are only allowed from a different thread`），会把 Gradio/CLI 弄坏；而图的节点全是同步的（subprocess、文件 IO），本来也没有异步的必要。改为**保留一套同步 checkpointer，把同步流桥接进 Chainlit 的 async 处理器**（`agent.py` 新增 `astream_sync`）：同步生成器放进 `daemon=True` 的工作线程里跑，事件经 `loop.call_soon_threadsafe` 送进 `asyncio.Queue`，用一个唯一哨兵对象标示结束（不用 `None`，因为生成器可能 yield 出合法的假值），异常原样带回消费协程再抛；关键在于迭代整体在 `contextvars.copy_context()` 里 `ctx.run(...)`，把 async handler 设的 `current_workspace` 带进工作线程。前端改为 `async for event in A.astream_sync(A.agent_executor.stream(init, config, stream_mode="updates"))`。一个进程内验证：裸 `astream` 仍抛 `NotImplementedError`（修前），桥接版正常收事件、且同步 `get_state` 能读回 async 驱动那次写下的状态（修后）。
+
+**可迁移的经验**：**checkpointer 的 sync/async 能力必须匹配每一个调用编译后图的调用方，而不是只测过的那个。** 一个模块级 `compile()` 会把「执行模型」这个决定悄悄固定下来，谁用同一张图谁就得受它约束。一个图有多个入口时，改任何全局的东西（checkpointer、回调、序列化）都要把每个入口都跑一遍——这正是 BUG-10「入口多、测试少」的同一个坑。
+
+---
+
 ## 已知未修
 
 按「离修好还差多远」排：
